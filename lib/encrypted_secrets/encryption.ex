@@ -25,27 +25,20 @@ defmodule EncryptedSecrets.Encryption do
     init_vec = :crypto.strong_rand_bytes(16)
     payload = pad(clear_text, @aes_block_size)
 
-    case :crypto.block_encrypt(:aes_cbc256, key, init_vec, payload) do
-      {cipher_text, cipher_tag} ->
-        {authentication_data, _clear_text} = payload
-        {:ok, {authentication_data, {init_vec, cipher_text, cipher_tag}}}
-
-      <<cipher_text::binary>> ->
-        {:ok, {init_vec, cipher_text}}
-
-      err ->
-        {:error, err}
-    end
+    {:ok,
+     {init_vec,
+      :crypto.crypto_init(:aes_256_cbc, key, init_vec, true)
+      |> :crypto.crypto_update(payload)}}
   end
 
   @doc """
     Decrypts `cipher_text` using the given `key` and `init_vec`
   """
   def decrypt(key, init_vec, cipher_text) do
-    case :crypto.block_decrypt(:aes_cbc256, key, init_vec, cipher_text) do
-      :error -> {:error, :decrypt_failed}
-      plain_text -> {:ok, unpad(plain_text)}
-    end
+    {:ok,
+     :crypto.crypto_init(:aes_256_cbc, key, init_vec, false)
+     |> :crypto.crypto_update(cipher_text)
+     |> unpad()}
   end
 
   defp pad(data, block_size) do
